@@ -1,0 +1,19 @@
+[Unit]
+Description=LEA Discord Late Attendance Automation
+After=network.target
+
+[Service]
+Type=simple
+User=lea
+WorkingDirectory=/opt/lea-automation
+EnvironmentFile=/opt/lea-automation/.env
+ExecStart=/opt/lea-automation/.venv/bin/python -m lea_automation.main
+Restart=on-failure
+RestartSec=10
+
+# Graceful shutdown
+TimeoutStopSec=30
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target

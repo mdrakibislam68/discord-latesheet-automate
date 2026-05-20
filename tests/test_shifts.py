@@ -18,6 +18,7 @@ def test_regular_sign_in_shifts():
     os.environ["GOOGLE_SHEETS_CREDENTIALS"] = "{}"
     os.environ["GOOGLE_SHEET_ID"] = "fake"
     os.environ["SECOND_SHIFT_USERS"] = "rakib, john"
+    os.environ["SECOND_SHIFT_CUTOFF_TIME"] = "14:00"
     
     config = load_config()
     tc = TimeChecker(config)
@@ -61,6 +62,7 @@ def test_manual_time_sign_in_shifts():
     os.environ["GOOGLE_SHEETS_CREDENTIALS"] = "{}"
     os.environ["GOOGLE_SHEET_ID"] = "fake"
     os.environ["SECOND_SHIFT_USERS"] = "rakib, john"
+    os.environ["SECOND_SHIFT_CUTOFF_TIME"] = "14:00"
     
     config = load_config()
     

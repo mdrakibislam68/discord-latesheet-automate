@@ -14,6 +14,7 @@ class Config:
     google_sheet_id: str = ""
     holidays: FrozenSet[str] = field(default_factory=frozenset)
     second_shift_users: FrozenSet[str] = field(default_factory=frozenset)
+    second_shift_cutoff_time: str = "14:00"
     poll_interval_seconds: float = 60.0
     port: int = 8080
 
@@ -24,6 +25,14 @@ class Config:
     @property
     def cutoff_minute(self) -> int:
         return int(self.cutoff_time.split(":")[1])
+
+    @property
+    def second_shift_cutoff_hour(self) -> int:
+        return int(self.second_shift_cutoff_time.split(":")[0])
+
+    @property
+    def second_shift_cutoff_minute(self) -> int:
+        return int(self.second_shift_cutoff_time.split(":")[1])
 
 
 def load_config() -> Config:
@@ -47,6 +56,7 @@ def load_config() -> Config:
         google_sheet_id=os.environ.get("GOOGLE_SHEET_ID", ""),
         holidays=holidays,
         second_shift_users=second_shift_users,
+        second_shift_cutoff_time=os.environ.get("SECOND_SHIFT_CUTOFF_TIME", "14:00"),
         poll_interval_seconds=float(
             os.environ.get("POLL_INTERVAL_SECONDS", "60")
         ),

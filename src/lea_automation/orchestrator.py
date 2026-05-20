@@ -200,7 +200,7 @@ class Orchestrator(SigninHandler):
         
         # Check if the user is in the second shift
         if user and user.lower().strip() in self._config.second_shift_users:
-            cutoff_time = time(14, 0) # 02:00 PM (14:00)
+            cutoff_time = time(self._config.second_shift_cutoff_hour, self._config.second_shift_cutoff_minute)
         else:
             cutoff_time = time(self._config.cutoff_hour, self._config.cutoff_minute)
         

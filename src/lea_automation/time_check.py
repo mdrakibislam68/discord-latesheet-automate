@@ -48,6 +48,7 @@ class TimeChecker:
                 extra={"extra_fields": {"configured": config.timezone}},
             )
         self._cutoff = time(config.cutoff_hour, config.cutoff_minute)
+        self._second_shift_cutoff = time(config.second_shift_cutoff_hour, config.second_shift_cutoff_minute)
         
         # Robustly parse holiday date strings to support any format configured in .env (e.g. YYYY-MM-DD, D-Mmm-YYYY)
         self._holidays = set()
@@ -79,7 +80,7 @@ class TimeChecker:
         
         cutoff = self._cutoff
         if user and user.lower().strip() in self._config.second_shift_users:
-            cutoff = time(14, 0) # 02:00 PM (14:00)
+            cutoff = self._second_shift_cutoff
             
         return local_time >= cutoff
 

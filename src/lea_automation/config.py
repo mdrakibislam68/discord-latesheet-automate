@@ -13,6 +13,7 @@ class Config:
     google_sheets_credentials: str = ""
     google_sheet_id: str = ""
     holidays: FrozenSet[str] = field(default_factory=frozenset)
+    second_shift_users: FrozenSet[str] = field(default_factory=frozenset)
     poll_interval_seconds: float = 60.0
     port: int = 8080
 
@@ -30,6 +31,10 @@ def load_config() -> Config:
     holidays = frozenset(
         d.strip() for d in holidays_raw.split(",") if d.strip()
     )
+    second_shift_raw = os.environ.get("SECOND_SHIFT_USERS", "")
+    second_shift_users = frozenset(
+        u.strip().lower() for u in second_shift_raw.split(",") if u.strip()
+    )
     return Config(
         cutoff_time=os.environ.get("CUTOFF_TIME", "10:00"),
         timezone=os.environ.get("TIMEZONE", "America/New_York"),
@@ -41,6 +46,7 @@ def load_config() -> Config:
         ),
         google_sheet_id=os.environ.get("GOOGLE_SHEET_ID", ""),
         holidays=holidays,
+        second_shift_users=second_shift_users,
         poll_interval_seconds=float(
             os.environ.get("POLL_INTERVAL_SECONDS", "60")
         ),

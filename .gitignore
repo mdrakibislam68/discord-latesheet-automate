@@ -5,3 +5,4 @@ __pycache__/
 *.egg-info/
 dist/
 .gspread_token.json
+manual_signins.json

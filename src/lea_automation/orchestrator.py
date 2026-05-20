@@ -76,7 +76,7 @@ class Orchestrator(SigninHandler):
                 return
 
             dt = _parse_timestamp(raw_ts)
-            result = self._time_checker.evaluate(dt)
+            result = self._time_checker.evaluate(dt, name)
 
             log_extra = {
                 "extra_fields": {
@@ -197,7 +197,12 @@ class Orchestrator(SigninHandler):
                 hour += 12
                 
         manual_time = time(hour, minute)
-        cutoff_time = time(self._config.cutoff_hour, self._config.cutoff_minute)
+        
+        # Check if the user is in the second shift
+        if user and user.lower().strip() in self._config.second_shift_users:
+            cutoff_time = time(14, 0) # 02:00 PM (14:00)
+        else:
+            cutoff_time = time(self._config.cutoff_hour, self._config.cutoff_minute)
         
         time_str = f"{hour:02d}:{minute:02d}"
         

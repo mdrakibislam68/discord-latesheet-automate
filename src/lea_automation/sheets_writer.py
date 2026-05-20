@@ -292,27 +292,6 @@ class SheetsWriter:
         col = local_dt.day + 1
         
         ws.update_cell(row, col, "")
-        
-        try:
-            col_letter = self._col_to_letter(col)
-            ws.format(f"{col_letter}{row}", {
-                "backgroundColor": {
-                    "red": 0.82,
-                    "green": 0.98,
-                    "blue": 0.90
-                },
-                "textFormat": {
-                    "bold": True,
-                    "foregroundColor": {
-                        "red": 0.06,
-                        "green": 0.48,
-                        "blue": 0.28
-                    }
-                },
-                "horizontalAlignment": "CENTER"
-            })
-        except Exception:
-            logger.warning("could_not_format_ontime_cell", exc_info=True)
 
         logger.info(
             "on_time_entry_written",

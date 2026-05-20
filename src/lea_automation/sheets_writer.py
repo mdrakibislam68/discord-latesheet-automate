@@ -130,23 +130,6 @@ class SheetsWriter:
                             },
                             "horizontalAlignment": "CENTER"
                         })
-                    else:
-                        # Revert background to clean white for standard workdays!
-                        self._worksheet.format(f"{col_letter}2:{col_letter}1000", {
-                            "backgroundColor": {
-                                "red": 1.0,
-                                "green": 1.0,
-                                "blue": 1.0
-                            },
-                            "textFormat": {
-                                "italic": False,
-                                "foregroundColor": {
-                                    "red": 0.0,
-                                    "green": 0.0,
-                                    "blue": 0.0
-                                }
-                            }
-                        })
                 except Exception:
                     logger.warning(f"could_not_format_col_{col_letter}", exc_info=True)
 
@@ -169,6 +152,27 @@ class SheetsWriter:
                                 if not is_weekend and not is_holiday and cell_val in ("Holiday", "Weekend"):
                                     row[col_idx - 1] = ""
                                     row_updated = True
+                                    
+                                    # Clear formatting for this specific cell back to white!
+                                    col_letter = self._col_to_letter(col_idx)
+                                    try:
+                                        self._worksheet.format(f"{col_letter}{r_idx + 1}", {
+                                            "backgroundColor": {
+                                                "red": 1.0,
+                                                "green": 1.0,
+                                                "blue": 1.0
+                                            },
+                                            "textFormat": {
+                                                "italic": False,
+                                                "foregroundColor": {
+                                                    "red": 0.0,
+                                                    "green": 0.0,
+                                                    "blue": 0.0
+                                                }
+                                            }
+                                        })
+                                    except Exception:
+                                        pass
                         if row_updated:
                             self._worksheet.update(f"A{r_idx + 1}", [row])
             except Exception:
@@ -287,7 +291,7 @@ class SheetsWriter:
         
         col = local_dt.day + 1
         
-        ws.update_cell(row, col, "On Time")
+        ws.update_cell(row, col, "")
         
         try:
             col_letter = self._col_to_letter(col)

@@ -19,6 +19,10 @@ class SigninFilter:
         self._end_minute = config.active_end_minute
 
     def is_signin(self, content: str) -> str | None:
+        content_lower = content.lower()
+        if "half day" in content_lower or "half-day" in content_lower:
+            if re.search(r"\bhalf[- ]day\b", content_lower):
+                return "half day"
         for pattern, kw in self._patterns:
             if pattern.search(content):
                 return kw

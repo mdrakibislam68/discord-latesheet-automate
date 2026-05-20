@@ -36,6 +36,14 @@ class SheetsWriter:
             except Exception:
                 logger.warning(f"failed_to_parse_holiday_in_sheets: {h}", exc_info=True)
 
+        # Automatically load, shade, and heal the worksheet on bot startup!
+        try:
+            from lea_automation.time_check import TimeChecker
+            tc = TimeChecker(config)
+            self._ensure_worksheet(tc.now_local())
+        except Exception:
+            logger.warning("failed_to_ensure_worksheet_on_startup", exc_info=True)
+
     @staticmethod
     def _build_client(config: Config) -> gspread.Client:
         import os
@@ -304,6 +312,50 @@ class SheetsWriter:
 
         logger.info(
             "on_time_entry_written",
+            extra={
+                "extra_fields": {
+                    "name": name,
+                    "timestamp_utc": timestamp_utc,
+                    "sheet_name": ws.title,
+                }
+            },
+        )
+
+    def append_half_day_entry(
+        self, name: str, timestamp_utc: str, timestamp_local: str
+    ) -> None:
+        from datetime import datetime
+        local_dt = datetime.fromisoformat(timestamp_local)
+        ws = self._ensure_worksheet(local_dt)
+        row = self._find_or_create_user_row(ws, name, local_dt)
+        
+        col = local_dt.day + 1
+        
+        ws.update_cell(row, col, "Half day")
+        
+        try:
+            col_letter = self._col_to_letter(col)
+            ws.format(f"{col_letter}{row}", {
+                "backgroundColor": {
+                    "red": 0.82,
+                    "green": 0.98,
+                    "blue": 0.90
+                },
+                "textFormat": {
+                    "bold": True,
+                    "foregroundColor": {
+                        "red": 0.06,
+                        "green": 0.48,
+                        "blue": 0.28
+                    }
+                },
+                "horizontalAlignment": "CENTER"
+            })
+        except Exception:
+            logger.warning("could_not_format_halfday_cell", exc_info=True)
+
+        logger.info(
+            "half_day_entry_written",
             extra={
                 "extra_fields": {
                     "name": name,

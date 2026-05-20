@@ -67,6 +67,13 @@ class TestIsSignin:
         f = SigninFilter(c)
         assert f.is_signin("here") is None
 
+    def test_half_day_detection(self, filter_instance: SigninFilter) -> None:
+        assert filter_instance.is_signin("half day") == "half day"
+        assert filter_instance.is_signin("half-day") == "half day"
+        assert filter_instance.is_signin("I want half day today") == "half day"
+        assert filter_instance.is_signin("applying for half-day") == "half day"
+        assert filter_instance.is_signin("halfday") is None
+
 
 class TestIsWithinActiveHours:
     def test_within_window(self, filter_instance: SigninFilter) -> None:

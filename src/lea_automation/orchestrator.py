@@ -90,16 +90,29 @@ class Orchestrator(SigninHandler):
                 logger.info("message_skipped_not_processing_day", extra=log_extra)
                 return
 
-            status = "late" if result["is_late"] else "on_time"
+            # Check specifically for "half day" request (case-insensitive)
+            is_half_day = (
+                message.get("matched_keyword", "").lower() == "half-day"
+                or message.get("matched_keyword", "").lower() == "half day"
+                or "half day" in content.lower()
+                or "half-day" in content.lower()
+            )
 
-            if result["is_late"]:
-                self._sheets.append_late_entry(
+            if is_half_day:
+                status = "half_day"
+                self._sheets.append_half_day_entry(
                     name, result["timestamp_utc"], result["timestamp_local"]
                 )
             else:
-                self._sheets.append_on_time_entry(
-                    name, result["timestamp_utc"], result["timestamp_local"]
-                )
+                status = "late" if result["is_late"] else "on_time"
+                if result["is_late"]:
+                    self._sheets.append_late_entry(
+                        name, result["timestamp_utc"], result["timestamp_local"]
+                    )
+                else:
+                    self._sheets.append_on_time_entry(
+                        name, result["timestamp_utc"], result["timestamp_local"]
+                    )
 
             logger.info(
                 f"message_{status}",

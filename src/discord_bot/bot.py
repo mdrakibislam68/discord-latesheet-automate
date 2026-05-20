@@ -48,9 +48,8 @@ class SigninBot:
                 return
 
             matched_keyword = self._filter.is_signin(message.content)
-            in_window = self._filter.is_within_active_hours(message.created_at)
-
-            if not matched_keyword and not in_window:
+            
+            if not matched_keyword:
                 logger.debug(
                     "message_skipped",
                     extra={

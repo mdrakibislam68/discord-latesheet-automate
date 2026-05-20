@@ -78,8 +78,33 @@ class SheetsWriter:
     def append_late_entry(
         self, name: str, timestamp_utc: str, timestamp_local: str
     ) -> None:
+        import re
         ws = self._ensure_worksheet()
-        ws.append_row([name, timestamp_utc, timestamp_local, "Late"])
+        res = ws.append_row([name, timestamp_utc, timestamp_local, "Late"])
+        
+        try:
+            updated_range = res.get("updates", {}).get("updatedRange", "")
+            match = re.search(r"A(\d+):", updated_range)
+            if match:
+                row = match.group(1)
+                ws.format(f"D{row}", {
+                    "backgroundColor": {
+                        "red": 1.0,
+                        "green": 0.8,
+                        "blue": 0.8
+                    },
+                    "textFormat": {
+                        "bold": True,
+                        "foregroundColor": {
+                            "red": 0.8,
+                            "green": 0.0,
+                            "blue": 0.0
+                        }
+                    }
+                })
+        except Exception:
+            logger.warning("could_not_format_late_cell", exc_info=True)
+
         logger.info(
             "late_entry_written",
             extra={

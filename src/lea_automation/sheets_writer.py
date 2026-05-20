@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 import json
 from datetime import date
 from typing import Any
@@ -23,9 +24,8 @@ class SheetsWriter:
         self._config = config
         self._client = self._build_client(config)
         self._sheet = self._client.open_by_key(config.google_sheet_id)
-        self._current_day: date | None = None
+        self._current_month: str | None = None
         self._worksheet: Worksheet | None = None
-        self._ensure_worksheet()
 
     @staticmethod
     def _build_client(config: Config) -> gspread.Client:
@@ -49,22 +49,88 @@ class SheetsWriter:
             print("Success! Google Sheets authorization complete and token saved.\n")
         return gspread.authorize(creds)
 
-    def _ensure_worksheet(self) -> Worksheet:
-        today = date.today()
-        sheet_name = today.isoformat()
-        if self._current_day != today:
+    @staticmethod
+    def _col_to_letter(col: int) -> str:
+        letter = ""
+        while col > 0:
+            col, remainder = divmod(col - 1, 26)
+            letter = chr(65 + remainder) + letter
+        return letter
+
+    def _ensure_worksheet(self, local_dt: datetime) -> Worksheet:
+        import calendar
+        sheet_name = local_dt.strftime("%B %Y")
+        if self._current_month != sheet_name:
             try:
                 self._worksheet = self._sheet.worksheet(sheet_name)
+                # Check if it has the grid layout. If not, recreate it!
+                headers = self._worksheet.row_values(1)
+                if len(headers) < 28 or "Name" not in headers[0] or "1-" not in headers[1]:
+                    logger.info("recreating_sheet_with_grid_layout", extra={"extra_fields": {"sheet_name": sheet_name}})
+                    try:
+                        self._sheet.del_worksheet(self._worksheet)
+                    except Exception:
+                        pass
+                    raise gspread.WorksheetNotFound()
             except gspread.WorksheetNotFound:
+                # Create a grid-sheet for the month
+                num_days = calendar.monthrange(local_dt.year, local_dt.month)[1]
                 self._worksheet = self._sheet.add_worksheet(
-                    title=sheet_name, rows=500, cols=10
+                    title=sheet_name, rows=1000, cols=40
                 )
-                self._worksheet.append_row(
-                    ["Name", "Timestamp (UTC)", "Timestamp (Local)", "Status"]
-                )
-            self._current_day = today
+                
+                headers = ["Name"]
+                for day in range(1, num_days + 1):
+                    headers.append(f"{day}-{local_dt.strftime('%b-%Y')}")
+                
+                self._worksheet.append_row(headers)
+                
+                # Shade weekend columns with soft gray background
+                for day in range(1, num_days + 1):
+                    if calendar.weekday(local_dt.year, local_dt.month, day) >= 5:
+                        col_letter = self._col_to_letter(day + 1)
+                        try:
+                            self._worksheet.format(f"{col_letter}2:{col_letter}1000", {
+                                "backgroundColor": {
+                                    "red": 0.95,
+                                    "green": 0.96,
+                                    "blue": 0.96
+                                },
+                                "textFormat": {
+                                    "italic": True,
+                                    "foregroundColor": {
+                                        "red": 0.5,
+                                        "green": 0.5,
+                                        "blue": 0.5
+                                    }
+                                },
+                                "horizontalAlignment": "CENTER"
+                            })
+                        except Exception:
+                            logger.warning(f"could_not_shade_weekend_col_{col_letter}", exc_info=True)
+
+            # Format headers to look clean, white-background, and bold black text
+            # This runs for both brand new and already existing worksheets to guarantee correct styling!
+            try:
+                self._worksheet.format("A1:AN1", {
+                    "textFormat": {
+                        "bold": True,
+                        "fontSize": 12,
+                        "foregroundColor": {"red": 0.0, "green": 0.0, "blue": 0.0}
+                    },
+                    "backgroundColor": {
+                        "red": 1.0,
+                        "green": 1.0,
+                        "blue": 1.0
+                    },
+                    "horizontalAlignment": "CENTER"
+                })
+            except Exception:
+                logger.warning("could_not_format_headers", exc_info=True)
+                            
+            self._current_month = sheet_name
             logger.info(
-                "daily_sheet_ready",
+                "monthly_sheet_ready",
                 extra={
                     "extra_fields": {
                         "sheet_name": sheet_name,
@@ -75,33 +141,56 @@ class SheetsWriter:
         assert self._worksheet is not None
         return self._worksheet
 
+    def _find_or_create_user_row(self, ws: Worksheet, name: str, local_dt: datetime) -> int:
+        import calendar
+        names = ws.col_values(1)
+        if name in names:
+            return names.index(name) + 1
+            
+        # Create a new row for this user
+        num_days = calendar.monthrange(local_dt.year, local_dt.month)[1]
+        new_row = [name]
+        for day in range(1, num_days + 1):
+            if calendar.weekday(local_dt.year, local_dt.month, day) >= 5:
+                new_row.append("Weekend")
+            else:
+                new_row.append("")
+                
+        ws.append_row(new_row)
+        return len(names) + 1
+
     def append_late_entry(
         self, name: str, timestamp_utc: str, timestamp_local: str
     ) -> None:
-        import re
-        ws = self._ensure_worksheet()
-        res = ws.append_row([name, timestamp_utc, timestamp_local, "Late"])
+        from datetime import datetime
+        local_dt = datetime.fromisoformat(timestamp_local)
+        ws = self._ensure_worksheet(local_dt)
+        row = self._find_or_create_user_row(ws, name, local_dt)
+        
+        col = local_dt.day + 1
+        time_str = local_dt.strftime("%H:%M")
+        value = f"Late-{time_str}"
+        
+        ws.update_cell(row, col, value)
         
         try:
-            updated_range = res.get("updates", {}).get("updatedRange", "")
-            match = re.search(r"A(\d+):", updated_range)
-            if match:
-                row = match.group(1)
-                ws.format(f"D{row}", {
-                    "backgroundColor": {
-                        "red": 1.0,
-                        "green": 0.8,
-                        "blue": 0.8
-                    },
-                    "textFormat": {
-                        "bold": True,
-                        "foregroundColor": {
-                            "red": 0.8,
-                            "green": 0.0,
-                            "blue": 0.0
-                        }
+            col_letter = self._col_to_letter(col)
+            ws.format(f"{col_letter}{row}", {
+                "backgroundColor": {
+                    "red": 1.0,
+                    "green": 0.8,
+                    "blue": 0.8
+                },
+                "textFormat": {
+                    "bold": True,
+                    "foregroundColor": {
+                        "red": 0.8,
+                        "green": 0.0,
+                        "blue": 0.0
                     }
-                })
+                },
+                "horizontalAlignment": "CENTER"
+            })
         except Exception:
             logger.warning("could_not_format_late_cell", exc_info=True)
 
@@ -119,8 +208,36 @@ class SheetsWriter:
     def append_on_time_entry(
         self, name: str, timestamp_utc: str, timestamp_local: str
     ) -> None:
-        ws = self._ensure_worksheet()
-        ws.append_row([name, timestamp_utc, timestamp_local, "On Time"])
+        from datetime import datetime
+        local_dt = datetime.fromisoformat(timestamp_local)
+        ws = self._ensure_worksheet(local_dt)
+        row = self._find_or_create_user_row(ws, name, local_dt)
+        
+        col = local_dt.day + 1
+        
+        ws.update_cell(row, col, "On Time")
+        
+        try:
+            col_letter = self._col_to_letter(col)
+            ws.format(f"{col_letter}{row}", {
+                "backgroundColor": {
+                    "red": 0.82,
+                    "green": 0.98,
+                    "blue": 0.90
+                },
+                "textFormat": {
+                    "bold": True,
+                    "foregroundColor": {
+                        "red": 0.06,
+                        "green": 0.48,
+                        "blue": 0.28
+                    }
+                },
+                "horizontalAlignment": "CENTER"
+            })
+        except Exception:
+            logger.warning("could_not_format_ontime_cell", exc_info=True)
+
         logger.info(
             "on_time_entry_written",
             extra={

@@ -48,6 +48,15 @@ class TimeChecker:
                 extra={"extra_fields": {"configured": config.timezone}},
             )
         self._cutoff = time(config.cutoff_hour, config.cutoff_minute)
+        
+        # Robustly parse holiday date strings to support any format configured in .env (e.g. YYYY-MM-DD, D-Mmm-YYYY)
+        self._holidays = set()
+        from dateutil.parser import parse
+        for h in config.holidays:
+            try:
+                self._holidays.add(parse(h).date())
+            except Exception:
+                logger.warning(f"failed_to_parse_holiday_date: {h}", exc_info=True)
 
     @property
     def timezone_name(self) -> str:
@@ -83,7 +92,7 @@ class TimeChecker:
             d = self.today_local()
         if isinstance(d, datetime):
             d = d.date()
-        return d.isoformat() in self._config.holidays
+        return d in self._holidays
 
     def should_process_today(self, dt: datetime | date | None = None) -> bool:
         d = dt

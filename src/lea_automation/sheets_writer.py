@@ -26,6 +26,15 @@ class SheetsWriter:
         self._sheet = self._client.open_by_key(config.google_sheet_id)
         self._current_month: str | None = None
         self._worksheet: Worksheet | None = None
+        
+        # Robustly parse holiday dates configured in .env for sheet shading & labeling
+        self._holidays = set()
+        from dateutil.parser import parse
+        for h in config.holidays:
+            try:
+                self._holidays.add(parse(h).date())
+            except Exception:
+                logger.warning(f"failed_to_parse_holiday_in_sheets: {h}", exc_info=True)
 
     @staticmethod
     def _build_client(config: Config) -> gspread.Client:
@@ -84,30 +93,78 @@ class SheetsWriter:
                     headers.append(f"{day}-{local_dt.strftime('%b-%Y')}")
                 
                 self._worksheet.append_row(headers)
+
+            # Shade weekend and holiday columns with soft gray background, and reset other columns to white!
+            # This ensures only the exact current holidays in .env are applied, and cleans up any old/mock ones automatically!
+            num_days = calendar.monthrange(local_dt.year, local_dt.month)[1]
+            for day in range(1, num_days + 1):
+                from datetime import date
+                day_date = date(local_dt.year, local_dt.month, day)
+                is_weekend = calendar.weekday(local_dt.year, local_dt.month, day) >= 5
+                is_holiday = day_date in self._holidays
                 
-                # Shade weekend columns with soft gray background
-                for day in range(1, num_days + 1):
-                    if calendar.weekday(local_dt.year, local_dt.month, day) >= 5:
-                        col_letter = self._col_to_letter(day + 1)
-                        try:
-                            self._worksheet.format(f"{col_letter}2:{col_letter}1000", {
-                                "backgroundColor": {
-                                    "red": 0.95,
-                                    "green": 0.96,
-                                    "blue": 0.96
-                                },
-                                "textFormat": {
-                                    "italic": True,
-                                    "foregroundColor": {
-                                        "red": 0.5,
-                                        "green": 0.5,
-                                        "blue": 0.5
-                                    }
-                                },
-                                "horizontalAlignment": "CENTER"
-                            })
-                        except Exception:
-                            logger.warning(f"could_not_shade_weekend_col_{col_letter}", exc_info=True)
+                col_letter = self._col_to_letter(day + 1)
+                try:
+                    if is_weekend or is_holiday:
+                        self._worksheet.format(f"{col_letter}2:{col_letter}1000", {
+                            "backgroundColor": {
+                                "red": 0.95,
+                                "green": 0.96,
+                                "blue": 0.96
+                            },
+                            "textFormat": {
+                                "italic": True,
+                                "foregroundColor": {
+                                    "red": 0.5,
+                                    "green": 0.5,
+                                    "blue": 0.5
+                                }
+                            },
+                            "horizontalAlignment": "CENTER"
+                        })
+                    else:
+                        # Revert background to clean white for standard workdays!
+                        self._worksheet.format(f"{col_letter}2:{col_letter}1000", {
+                            "backgroundColor": {
+                                "red": 1.0,
+                                "green": 1.0,
+                                "blue": 1.0
+                            },
+                            "textFormat": {
+                                "italic": False,
+                                "foregroundColor": {
+                                    "red": 0.0,
+                                    "green": 0.0,
+                                    "blue": 0.0
+                                }
+                            }
+                        })
+                except Exception:
+                    logger.warning(f"could_not_format_col_{col_letter}", exc_info=True)
+
+            # Auto-clear any stray 'Holiday' or 'Weekend' text labels from non-disabled weekday cells
+            try:
+                rows_data = self._worksheet.get_all_values()
+                if len(rows_data) > 1:
+                    for r_idx in range(1, len(rows_data)):
+                        row = rows_data[r_idx]
+                        row_updated = False
+                        for day in range(1, num_days + 1):
+                            from datetime import date
+                            day_date = date(local_dt.year, local_dt.month, day)
+                            is_weekend = calendar.weekday(local_dt.year, local_dt.month, day) >= 5
+                            is_holiday = day_date in self._holidays
+                            
+                            col_idx = day + 1
+                            if col_idx <= len(row):
+                                cell_val = row[col_idx - 1]
+                                if not is_weekend and not is_holiday and cell_val in ("Holiday", "Weekend"):
+                                    row[col_idx - 1] = ""
+                                    row_updated = True
+                        if row_updated:
+                            self._worksheet.update(f"A{r_idx + 1}", [row])
+            except Exception:
+                logger.warning("failed_to_heal_holiday_row_values", exc_info=True)
 
             # Format headers to look clean, white-background, and bold black text
             # This runs for both brand new and already existing worksheets to guarantee correct styling!
@@ -151,8 +208,15 @@ class SheetsWriter:
         num_days = calendar.monthrange(local_dt.year, local_dt.month)[1]
         new_row = [name]
         for day in range(1, num_days + 1):
-            if calendar.weekday(local_dt.year, local_dt.month, day) >= 5:
+            from datetime import date
+            day_date = date(local_dt.year, local_dt.month, day)
+            is_weekend = calendar.weekday(local_dt.year, local_dt.month, day) >= 5
+            is_holiday = day_date in self._holidays
+            
+            if is_weekend:
                 new_row.append("Weekend")
+            elif is_holiday:
+                new_row.append("Holiday")
             else:
                 new_row.append("")
                 

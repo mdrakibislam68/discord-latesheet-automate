@@ -63,6 +63,7 @@ class SigninBot:
 
             data: dict[str, Any] = {
                 "user": message.author.name,
+                "user_id": str(message.author.id),
                 "timestamp": message.created_at.isoformat(),
                 "content": message.content,
                 "matched_keyword": matched_keyword or "",

@@ -74,12 +74,18 @@ class TimeChecker:
     def today_local(self) -> date:
         return self.now_local().date()
 
-    def is_late(self, message_dt: datetime, user: str | None = None) -> bool:
+    def is_late(self, message_dt: datetime, user: str | None = None, user_id: str | None = None) -> bool:
         local_dt = self.localize(message_dt)
         local_time = local_dt.time()
         
         cutoff = self._cutoff
+        is_sec = False
         if user and user.lower().strip() in self._config.second_shift_users:
+            is_sec = True
+        elif user_id and user_id.strip() in self._config.second_shift_users:
+            is_sec = True
+
+        if is_sec:
             cutoff = self._second_shift_cutoff
             
         return local_time >= cutoff
@@ -118,7 +124,7 @@ class TimeChecker:
             return False
         return True
 
-    def evaluate(self, message_dt: datetime, user: str | None = None) -> dict:
+    def evaluate(self, message_dt: datetime, user: str | None = None, user_id: str | None = None) -> dict:
         local_dt = self.localize(message_dt)
         local_date = local_dt.date()
         result = {
@@ -134,5 +140,5 @@ class TimeChecker:
         if not self.should_process_today(local_date):
             result["is_processed"] = False
             return result
-        result["is_late"] = self.is_late(message_dt, user)
+        result["is_late"] = self.is_late(message_dt, user, user_id)
         return result

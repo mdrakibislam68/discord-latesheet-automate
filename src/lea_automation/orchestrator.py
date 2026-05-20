@@ -66,6 +66,7 @@ class Orchestrator(SigninHandler):
         try:
             raw_ts = message.get("timestamp", "")
             name = message.get("user", message.get("author", message.get("name", "unknown")))
+            user_id = message.get("user_id", "")
             content = message.get("content", "")
 
             if not raw_ts:
@@ -76,7 +77,7 @@ class Orchestrator(SigninHandler):
                 return
 
             dt = _parse_timestamp(raw_ts)
-            result = self._time_checker.evaluate(dt, name)
+            result = self._time_checker.evaluate(dt, name, user_id)
 
             log_extra = {
                 "extra_fields": {
@@ -105,7 +106,7 @@ class Orchestrator(SigninHandler):
                 )
             else:
                 # Check if the user entered a manual time (e.g. 'Sign in 9:50AM')
-                is_manual_allowed, manual_time_str = self._check_manual_time(content, name, result["date"])
+                is_manual_allowed, manual_time_str = self._check_manual_time(content, name, result["date"], user_id)
                 
                 if manual_time_str is not None:
                     if is_manual_allowed:
@@ -169,7 +170,7 @@ class Orchestrator(SigninHandler):
                 extra={"extra_fields": {"message": message}},
             )
 
-    def _check_manual_time(self, content: str, user: str, local_date_str: str) -> tuple[bool, str | None]:
+    def _check_manual_time(self, content: str, user: str, local_date_str: str, user_id: str | None = None) -> tuple[bool, str | None]:
         """
         Extracts manual time from the content (e.g. 'Sign in 9:50AM') and checks if it's before cutoff.
         If before cutoff, checks if the user has used manual sign-in <= 3 times in the month.
@@ -199,7 +200,13 @@ class Orchestrator(SigninHandler):
         manual_time = time(hour, minute)
         
         # Check if the user is in the second shift
+        is_sec = False
         if user and user.lower().strip() in self._config.second_shift_users:
+            is_sec = True
+        elif user_id and user_id.strip() in self._config.second_shift_users:
+            is_sec = True
+
+        if is_sec:
             cutoff_time = time(self._config.second_shift_cutoff_hour, self._config.second_shift_cutoff_minute)
         else:
             cutoff_time = time(self._config.cutoff_hour, self._config.cutoff_minute)

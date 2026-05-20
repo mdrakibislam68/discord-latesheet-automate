@@ -54,6 +54,13 @@ def test_regular_sign_in_shifts():
     res_rakib_late = tc.evaluate(dt_shift2_late, "rakib")
     assert res_rakib_late["is_late"] is True
 
+    # --- TEST SHIFT 2 BY USER ID ---
+    os.environ["SECOND_SHIFT_USERS"] = "12345"
+    config_by_id = load_config()
+    tc_by_id = TimeChecker(config_by_id)
+    res_rakib_by_id = tc_by_id.evaluate(dt_shift2_early, "unknown_name", "12345")
+    assert res_rakib_by_id["is_late"] is False
+
 def test_manual_time_sign_in_shifts():
     os.environ["CUTOFF_TIME"] = "10:00"
     os.environ["TIMEZONE"] = "Asia/Dhaka"

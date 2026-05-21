@@ -149,30 +149,33 @@ class SheetsWriter:
                             col_idx = day + 1
                             if col_idx <= len(row):
                                 cell_val = row[col_idx - 1]
-                                if not is_weekend and not is_holiday and cell_val in ("Holiday", "Weekend"):
-                                    row[col_idx - 1] = ""
-                                    row_updated = True
-                                    
-                                    # Clear formatting for this specific cell back to white!
-                                    col_letter = self._col_to_letter(col_idx)
-                                    try:
-                                        self._worksheet.format(f"{col_letter}{r_idx + 1}", {
-                                            "backgroundColor": {
-                                                "red": 1.0,
-                                                "green": 1.0,
-                                                "blue": 1.0
-                                            },
-                                            "textFormat": {
-                                                "italic": False,
-                                                "foregroundColor": {
-                                                    "red": 0.0,
-                                                    "green": 0.0,
-                                                    "blue": 0.0
+                                if not is_weekend and not is_holiday:
+                                    # Clear formatting if the cell is Holiday, Weekend, or empty!
+                                    # This un-shades former holiday/weekend cells back to white while preserving 'Late' and 'Half day' cells!
+                                    if cell_val in ("Holiday", "Weekend") or not cell_val.strip():
+                                        if cell_val in ("Holiday", "Weekend"):
+                                            row[col_idx - 1] = ""
+                                            row_updated = True
+                                        
+                                        col_letter = self._col_to_letter(col_idx)
+                                        try:
+                                            self._worksheet.format(f"{col_letter}{r_idx + 1}", {
+                                                "backgroundColor": {
+                                                    "red": 1.0,
+                                                    "green": 1.0,
+                                                    "blue": 1.0
+                                                },
+                                                "textFormat": {
+                                                    "italic": False,
+                                                    "foregroundColor": {
+                                                        "red": 0.0,
+                                                        "green": 0.0,
+                                                        "blue": 0.0
+                                                    }
                                                 }
-                                            }
-                                        })
-                                    except Exception:
-                                        pass
+                                            })
+                                        except Exception:
+                                            pass
                         if row_updated:
                             self._worksheet.update(f"A{r_idx + 1}", [row])
             except Exception:
